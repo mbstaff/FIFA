@@ -1,0 +1,154 @@
+---
+title: "v2progress"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+Import dataset from: [link](https://www.kaggle.com/kevinmh/fifa-18-more-complete-player-dataset)
+
+```{r}
+suppressWarnings(library(readr))
+suppressWarnings(library(tidyverse))
+complete <- read_csv("~/R/r4ds/soccer/complete.csv")
+```
+make subsets of data
+```{r}
+complete[1:15]
+table(complete$international_reputation)
+ggplot(data = complete) + 
+  geom_bar(mapping = aes(x = international_reputation))
+```
+
+```{r}
+dplyr::mutate(complete, bmi = height_cm/weight_kg)
+stars <- filter(complete, international_reputation>2)
+super_star <- filter(stars, international_reputation>3)
+rmd <- filter(complete, club == "Real Madrid CF")
+barc <- filter(complete, club == "FC Barcelona")
+data.combined <- rbind(rmd, barc)%>%
+  select(name, age, league, body_type)
+```
+apply to all skills in dataset to see which have large positive or negative correlations
+```{r}
+skills <- select(complete, 34:67)%>%
+  cor()%>%
+  as_tibble
+  mutate(skills, skill = colnames(skills))
+```
+Table finds which skills are most correlated with each other. 
+```{r}
+ability <- select(complete, overall, ball_control, gk_diving, dribbling, penalties, positioning)
+cor(ability)%>%
+as_tibble()
+#use random sample or visualization will be a bunch of blobs
+  slice(ability, sample(1:17994, 100, replace = FALSE))%>%
+  pairs()
+
+
+```
+Those who are good at positionig and ball control have higher overall socres. Goal kick diving correlates with lower scores. 
+
+```{r}
+ggplot(data = complete) + 
+  geom_point(mapping = aes(x = height_cm, y = weight_kg, color = body_type))+
+  labs(x = "Height", y = "Weight", title = "Height and Weight Range by Body Type", color = "Body Type")
+
+```
+Wage vs international reputation
+
+```{r}
+  ggplot(data = complete) +
+  geom_point(mapping = aes(x = international_reputation, y = eur_wage))
+```
+value, potential, overall, wage
+```{r}
+ggplot(data = complete) +
+  geom_point(mapping = aes(x = potential, y = eur_wage))
+ggplot(data = complete) +
+  geom_point(mapping = aes(x = eur_value, y = eur_wage))
+ggplot(data = complete) +
+  geom_point(mapping = aes(x = overall, y = eur_wage))
+ggplot(data = complete) +
+  geom_point(mapping = aes(x = eur_wage, y = age))
+```
+take out 0 wage values and add column value for continent
+```{r}
+nozero <- filter(complete, eur_wage > 999, nationality != "São Tomé & Príncipe")
+Africa<-c('Algeria','Angola','Benin','Botswana','Burkina','Burundi','Cameroon','Cape Verde','Central African Republic','Chad','Comoros','Congo','Congo Democratic Republic of','Djibouti','Egypt','Equatorial Guinea','Eritrea','Ethiopia','Central African Rep.','DR Congo','Gabon','Gambia','Ghana','Guinea','Guinea Bissau','Guinea-Bissau','Ivory Coast','Kenya','Lesotho','Liberia','Libya','Madagascar','Malawi','Mali','Mauritania','Mauritius','Morocco','Mozambique','Namibia','Niger','Nigeria','Rwanda','S?o Tom? & Pr?ncipe','Sao Tome and Principe','Senegal','Seychelles','Sierra Leone','Somalia','South Africa','South Sudan','Sudan','Swaziland','Tanzania','Togo','Tunisia','Uganda','Zambia','Zimbabwe','Burkina Faso')
+Oceania<-c('Australia','Guam','New Caldonia', 'Fiji','Kiribati','Marshall Islands','Micronesia','Nauru','New Caledonia','New Zealand','Palau','Papua New Guinea','Samoa','Solomon Islands','Tonga','Tuvalu','Vanuatu')
+Asia<-c('Afghanistan','Bahrain','Bangladesh','Bhutan','Brunei','Burma (Myanmar)','Cambodia','China','China PR','East Timor','Hong Kong','India','Indonesia','Iran','Iraq','Israel','Japan','Jordan','Kazakhstan','North Korea','South Korea','Korea DPR','Korea Republic','Kuwait','Kyrgyzstan','Laos','Lebanon','Malaysia','Maldives','Mongolia','Nepal','Oman','Pakistan','Palestine','Philippines','Qatar','Russian Federation','Saudi Arabia','Singapore','Sri Lanka','Syria','Tajikistan','Thailand','Turkey','Turkmenistan','United Arab Emirates','Uzbekistan','Vietnam','Yemen','Russia')
+Europe<-c('Albania','Andorra','Armenia','Austria','Azerbaijan','Belarus','Belgium','Bosnia and Herzegovina','Bosnia Herzegovina','Bulgaria','Croatia','Cyprus','Czech Republic','Denmark','Estonia','Faroe Islands','FYR Macedonia','Gibraltar','Finland','France','Georgia','Germany','Greece','Hungary','Iceland','Ireland','Italy','Latvia','Liechtenstein','Kosovo','Lithuania','Luxembourg','Macedonia','Malta','Moldova','Monaco','Montenegro','Netherlands','Northern Ireland','Norway','Poland','Portugal','Romania','San Marino','Scotland','Serbia','Slovakia','Slovenia','Spain','Sweden','Switzerland','Ukraine','England','Vatican City','Republic of Ireland','Wales')
+North_america<-c('Antigua and Barbuda','Antigua & Barbuda','Bahamas','Barbados','Belize','Bermuda','Canada','Costa Rica','Cuba','Dominica','Dominican Republic','El Salvador','Grenada','Guatemala','Montserrat','Haiti','Honduras','Jamaica','Mexico','Nicaragua','Panama','Puerto Rico','Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','St Kitts Nevis','St Lucia','Trinidad and Tobago','United States')
+South_america<-c('Argentina','Curacao','Bolivia','Brazil','Chile','Colombia','Ecuador','Guyana','Paraguay','Peru','Suriname','Trinidad & Tobago','Uruguay','Venezuela')
+nozero$nationality[nozero$nationality %in% Africa] <- "Africa"
+nozero$nationality[nozero$nationality %in% Asia] <- "Asia"
+nozero$nationality[nozero$nationality %in% Europe] <- "Europe"
+nozero$nationality[nozero$nationality %in% North_america] <- "North_america"
+nozero$nationality[nozero$nationality %in% South_america]<-"South_america"
+nozero$nationality[nozero$nationality %in% Oceania] <- "Oceania"
+
+```
+
+Check for missing countries
+```{r}
+count(nozero, nationality)
+```
+Checks out
+
+```{r}
+nozero %>%
+  group_by(nationality)%>%
+  summarize_at(vars(eur_wage, overall), funs(mean,sd))
+```
+
+```{r}
+mean(complete$eur_wage)
+mean(stars$eur_wage)
+mean(super_star$eur_wage)
+max(complete$eur_wage)
+min(complete$eur_wage)
+#transmute_at(complete)
+```
+Why is the median so low?
+Hypothesis: players making no wage are young 
+```{r}
+free <- filter(complete, eur_wage == 0) %>%
+  select(full_name, age)
+ggplot(data = free)+
+  geom_bar(mapping = aes(x = age))
+ggplot(data = complete)+
+  geom_bar(mapping = aes(x = age))
+```
+Age is only slightly skewed to younger ages.  
+```{r}
+ggplot(data = nozero) + 
+  geom_point(mapping = aes(x = eur_value, y = overall)) + 
+  facet_wrap(~ nationality, nrow = 2) +
+  labs(title = "Wage Vs Skill", x = "Wage", ylab = "Skill Score")
+```
+continent and skill_moves
+```{r}
+nozero$skill_moves <- as.factor(nozero$skill_moves)
+ggplot(data = nozero) + 
+  geom_bar(mapping = aes(x = nationality, fill = skill_moves)) +
+  labs(x = "Continent",fill = "Ball Handeling")
+```
+Is this different for elite players?
+```{r}
+s <- filter(nozero, international_reputation>2)
+s$skill_moves <- as.factor(s$skill_moves)
+ggplot(data = s) + 
+  geom_bar(mapping = aes(x = nationality, fill = skill_moves)) +
+  labs(x = "Continent",fill = "Ball Handeling")
+```
+Scores are higher for this group.
+```{r}
+ggplot(data = nozero) +
+  geom_violin(mapping = aes(x = nationality, y = overall)) +
+  coord_flip()+
+  xlab("Continent")+
+  ylab("Score")
+```
+
+
